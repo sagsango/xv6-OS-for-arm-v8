@@ -11,4 +11,7 @@ clear
 echo Building xv6 for ARM 64 bit
 
 #make -j`getconf _NPROCESSORS_ONLN`
-make
+#make TOOLPREFIX=aarch64-linux-gnu- CC=aarch64-linux-gnu-gcc
+#TOOLPREFIX=aarch64-linux-gnu-  make TOOLPREFIX=aarch64-linux-gnu- CC=aarch64-linux-gnu-gcc LD=aarch64-linux-gnu-ld
+make TOOLPREFIX=aarch64-linux-gnu- OBJCOPY=aarch64-linux-gnu-objcopy OBJDUMP=aarch64-linux-gnu-objdump CC=aarch64-linux-gnu-gcc LD=aarch64-linux-gnu-ld
+

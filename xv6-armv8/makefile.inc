@@ -9,7 +9,7 @@ LD = $(CROSSCOMPILE)ld
 OBJCOPY = $(CROSSCOMPILE)objcopy
 OBJDUMP = $(CROSSCOMPILE)objdump
 
-CFLAGS = -march=armv8-a -mtune=cortex-a57 -fno-pic -static -fno-builtin -fno-strict-aliasing -Wall -Werror -I. -g 
+CFLAGS = -march=armv8-a -mtune=cortex-a57 -fno-pic -static -fno-builtin -fno-strict-aliasing -Wall -Werror -I. -g  -fno-stack-protector -Wno-error=infinite-recursion -fno-asynchronous-unwind-tables -fno-unwind-tables 
 LDFLAGS = -L.
 ASFLAGS = -march=armv8-a
 
