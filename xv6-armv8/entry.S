@@ -1,6 +1,7 @@
 #include "arm.h"
 #include "memlayout.h"
 
+# XXX: entry to kernel
 .text
 .align 16
 .global _start
