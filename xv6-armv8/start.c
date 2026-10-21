@@ -249,6 +249,46 @@ void load_pgtlb (uint64* kern_pgtbl, uint64* user_pgtbl)
 		*/
     asm("ISB": : :);
 
+		/* XXX:
+					VBAR_EL1 is an AArch64 system register that holds the exception
+					vector table base address for Exception Level 1 (EL1).  When an
+					exception is taken to EL1, the processor uses VBAR_EL1 and the
+					exception type to determine which handler entry to execute.
+
+
+					In AArch64, the exception vector table pointed to by VBAR_EL1 has 16 entries, each 128 bytes (0x80) apart.
+					Number of entries: 16
+					Size of each vector slot: 128 bytes
+					Total vector table size: 16 × 128 = 2048
+																	 16×128=2048 bytes = 2 KB
+					Required alignment: 2 KB (0x800)
+
+
+					VBAR_EL1 containes the exception handler for current (EL1) and the
+					lower EL (EL0), for an example:-
+					VBAR_EL1 = 0x80000000
+										Address        Offset     Meaning
+					-------------------------------------------------
+					0x80000000     +0x000     Current EL, SP0, Sync
+					0x80000080     +0x080     Current EL, SP0, IRQ
+					0x80000100     +0x100     Current EL, SP0, FIQ
+					0x80000180     +0x180     Current EL, SP0, SError
+
+					0x80000200     +0x200     Current EL, SPx, Sync
+					0x80000280     +0x280     Current EL, SPx, IRQ
+					0x80000300     +0x300     Current EL, SPx, FIQ
+					0x80000380     +0x380     Current EL, SPx, SError
+
+					0x80000400     +0x400     Lower EL, AArch64, Sync  <-- SVC from EL0
+					0x80000480     +0x480     Lower EL, AArch64, IRQ
+					0x80000500     +0x500     Lower EL, AArch64, FIQ
+					0x80000580     +0x580     Lower EL, AArch64, SError
+
+					0x80000600     +0x600     Lower EL, AArch32, Sync
+					0x80000680     +0x680     Lower EL, AArch32, IRQ
+					0x80000700     +0x700     Lower EL, AArch32, FIQ
+					0x80000780     +0x780     Lower EL, AArch32, SError
+		*/
     // set vector base address register
     _puts("Setting Vector Base Address Register (VBAR_EL1)\n");
     val64 = (uint64)&vectors;

@@ -141,7 +141,7 @@ vectors:
 
 	/* Lower EL using AArch64 */
 	.align	7
-	b	_el_lower_sync
+	b	_el_lower_sync       # XXX: syscall from EL0 will jump to this label address  
 	.align	7
 	b	_el_lower_irq
 	.align	7
