@@ -9,7 +9,7 @@ name: \
 	MOV x2, x1;\
 	MOV x1, x0;\
 	MOV x0, #SYS_ ## name;\
-	SVC 0x00;\
+	SVC 0x00;\ # XXX: supervisor call or software interrupt
 	LDR x4, [sp], #0x08;\
 	br x30;	//lr = x30
 
