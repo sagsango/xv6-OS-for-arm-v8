@@ -73,7 +73,7 @@ void set_bootpgtbl (uint64 virt, uint64 phy, uint len, int dev_mem )
 
         pde = phy & PMD_MASK;
 
-				/* XXX: TODO: pte attributes */
+				/* XXX: TODO: pte attributes google these */
         if (!dev_mem) {
             // normal memory
             pde |= ACCESS_FLAG | SH_IN_SH | AP_RW_1 | NON_SECURE_PA | MEM_ATTR_IDX_4 | ENTRY_BLOCK | ENTRY_VALID | UXN;
