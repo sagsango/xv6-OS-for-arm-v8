@@ -41,6 +41,10 @@ SECTIONS
     PROVIDE (_user_pgtbl = .);
     . += 0x1000;
 
+	  /* XXX: Page table root are here
+						0x4000 = 16KB
+						means 4 pages of size = 4KB
+	  */
     /* level 2 pages 4k * 4*/
     PROVIDE (_K_l2_pgtbl = .);
     . += 0x4000;

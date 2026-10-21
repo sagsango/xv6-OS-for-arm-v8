@@ -163,6 +163,10 @@ static int mappages (pgd_t *pgdir, void *va, uint size, uint pa, uint64 ap)
 // flush all TLB
 static void flush_tlb (void)
 {
+	/* XXX: invalidates all stage 1 Translation Lookaside Buffer (TLB) entries
+	 * used at Exception Level 1 (EL1) that match the current Virtual Machine
+	 * Identifier (VMID)
+	*/
     asm("TLBI VMALLE1" : : :);
 }
 
@@ -179,6 +183,7 @@ void switchuvm (struct proc *p)
 
     val64 = (uint64) V2P(p->pgdir) | 0x00;
 
+		/* XXX: Switch to new userspace page-table */
     asm("MSR TTBR0_EL1, %[v]": :[v]"r" (val64):);
     flush_tlb();
 

@@ -56,6 +56,7 @@ uint64 *user_pgtbl = &_user_pgtbl;
 
 extern void * vectors;
 
+/* XXX: init the root of the user_pgtbl & kerenl_pgtbl */
 // setup the boot page table: dev_mem whether it is device memory
 void set_bootpgtbl (uint64 virt, uint64 phy, uint len, int dev_mem )
 {
@@ -72,6 +73,7 @@ void set_bootpgtbl (uint64 virt, uint64 phy, uint len, int dev_mem )
 
         pde = phy & PMD_MASK;
 
+				/* XXX: TODO: pte attributes */
         if (!dev_mem) {
             // normal memory
             pde |= ACCESS_FLAG | SH_IN_SH | AP_RW_1 | NON_SECURE_PA | MEM_ATTR_IDX_4 | ENTRY_BLOCK | ENTRY_VALID | UXN;
@@ -439,6 +441,12 @@ void start (void)
 
     _puts("starting xv6 for ARMv8...\n");
 
+		/* XXX: first 2 bits of 32 bit address leads to the 
+					  2nd level page table.
+
+						So we will be having 4 offset in first level
+						to go to 2nd level
+		*/
     // Set PGD Entries (4 entries...supporting 32 bits)
     for(index = 0; index < 4; index++) {
         l2pgtbl = (uint64)&_K_l2_pgtbl;
