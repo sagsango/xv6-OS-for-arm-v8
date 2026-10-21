@@ -98,6 +98,14 @@ void load_pgtlb (uint64* kern_pgtbl, uint64* user_pgtbl)
     uint32	val32;
     uint64	val64;
 
+	  /* XXX: MIDR_EL1 : Provides identification information for the PE,
+											 including an implementer code for the device and
+											 a device ID number.
+
+											 The MIDR_EL1 (Main ID Register) can be read by 
+											 software running at EL1 (Kernel mode), EL2 
+											 (Hypervisor mode), or EL3 (Secure Monitor mode).
+		*/
     // read the main id register to make sure we are running on ARMv6
     asm("MRS %[r], MIDR_EL1":[r]"=r" (val32): :);
 
@@ -111,6 +119,19 @@ void load_pgtlb (uint64* kern_pgtbl, uint64* user_pgtbl)
         _puts ("Need AARM v6 or higher\n");
     }
 
+
+	  /* XXX: CurrentEL : (Current Exception Level)
+												to hold the current execution/exception level at
+												which the processor is running.
+
+												Can be read in EL1, EL2, EL3.
+
+												But not in EL0, read in EL0 will result this,
+												the processor will immediately block the execution
+												and trigger a Synchronous Exception (Trap) to a 
+												higher privilege level (usually EL1)
+		*/
+								
     //EL?
     asm("MRS %[r], CurrentEL":[r]"=r" (val32): :);
 
@@ -135,24 +156,97 @@ void load_pgtlb (uint64* kern_pgtbl, uint64* user_pgtbl)
     // flush TLB and cache
     _puts("Flushing TLB and Instr Cache\n");
 
+
+		/* XXX: The IC instruction requires an operation suffix that specifies what
+		 * level of cache to clear and what argument to pass:
+		 * • IC IALLU (Instruction Cache Invalidate All to PoU): Invalidates all
+					instruction caches up to the Point of Unification (PoU) for the current
+					processor core. It does not require a register argument.  
+
+		 * • IC IALLUIS (Instruction Cache Invalidate All to PoU, Inner Shareable):
+			Broadcasts the invalidation to all CPU cores in the same Inner Shareable 
+			domain. This ensures that every core's instruction cache is cleared simultaneously. 
+
+		 * • IC IVAU, <Xt> (Instruction Cache Invalidate by Virtual Address to PoU):
+		   Invalidates a single instruction cache line containing the Virtual Addres
+			 passed in the general-purpose register <Xt>.
+		*/
     //flush Instr Cache
     asm("IC IALLUIS": : :);
 
+
+		/* XXX: TLBI VMALLE1; 
+								Invalidate all Stage 1 & 2 TLB entries for current VMID at EL1/EL0
+		*/
     //flush TLB
     asm("TLBI VMALLE1" : : :);
+		
+		/* XXX: Ensure the TLB invalidation completes across the
+						we will wait untill then
+		*/
     asm("DSB SY" : : :);
 
+		/* XXX: CPACR_EL1 :
+									Controls access to trace, SME, Streaming SVE, SVE, and Advanced SIMD
+		 *						and floating-point functionality.
+		*/
     // no trapping on FP/SIMD instructions
     val32 = 0x03 << 20;
     asm("MSR CPACR_EL1, %[v]": :[v]"r" (val32):);
 
+		/* XXX: 
+					MDSCR_EL1, Monitor Debug System Control Register, EL1
+		*/
     // monitor debug: all disabled
     asm("MSR MDSCR_EL1, xzr":::);
 
+		/* XXX: MAIR_EL1:
+						The key point is that MAIR_EL1 does not assign each attribute to a
+						specific physical memory region. It defines eight possible
+						memory-attribute encodings. Your page tables determine which region
+						uses each attribute through the AttrIndx field in each page or block
+						descriptor.
+
+				Attr0
+					0x00
+					Device-nGnRnE
+				Attr1
+					0x04
+					Device-nGnRE
+				Attr2
+					0x0C
+					Device-GRE
+				Attr3
+					0x44
+					Normal, non-cacheable
+				Attr4
+					0xFF
+					Normal, write-back cacheable
+				Attr5
+					0x00
+					Device-nGnRnE
+				Attr6
+					0x00
+					Device-nGnRnE
+				Attr7
+					0x00
+					Device-nGnRnE
+
+			  In an AArch64 4-level page table, the AttrIndx field is bits [4:2] of 
+				each valid block or page descriptor. These 3 bits select the corresponding
+				attribute index in MAIR_EL1.
+	 */
     // set memory attribute indirection register
     _puts("Setting Memory Attribute Indirection Register (MAIR_EL1)\n");
     val64 = (uint64)0xFF440C0400;
     asm("MSR MAIR_EL1, %[v]": :[v]"r" (val64):);
+		/* XXX: Why ISB here?
+						
+						 ISB: is used to synchronize the processor after changing a system register.
+						 ISB: The processor ensures that subsequent instructions are fetched and
+									executed after the synchronization point, so they observe the relevant
+									updated architectural state.
+		*/
     asm("ISB": : :);
 
     // set vector base address register
