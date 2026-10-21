@@ -295,23 +295,117 @@ void load_pgtlb (uint64* kern_pgtbl, uint64* user_pgtbl)
     //val64 = val64 + (uint64)KERNBASE;
     asm("MSR VBAR_EL1, %[v]": :[v]"r" (val64):);
 
+
+		/* XXX:
+				## `TCR_EL1` — compact bit-field table
+
+| Bits | Field | Purpose |
+| --- | --- | --- |
+| `[5:0]` | `T0SZ` | `TTBR0` virtual address size |
+| `[7]` | `EPD0` | Disable `TTBR0` table walks |
+| `[9:8]` | `IRGN0` | Inner cacheability, table walks |
+| `[11:10]` | `ORGN0` | Outer cacheability, table walks |
+| `[13:12]` | `SH0` | `TTBR0` walk shareability |
+| `[15:14]` | `TG0` | `TTBR0` page granule |
+| `[21:16]` | `T1SZ` | `TTBR1` virtual address size |
+| `[22]` | `A1` | Select TTBR for ASID |
+| `[23]` | `EPD1` | Disable `TTBR1` table walks |
+| `[25:24]` | `IRGN1` | Inner cacheability, table walks |
+| `[27:26]` | `ORGN1` | Outer cacheability, table walks |
+| `[29:28]` | `SH1` | `TTBR1` walk shareability |
+| `[31:30]` | `TG1` | `TTBR1` page granule |
+| `[34:32]` | `IPS` | Physical address size |
+| `[36]` | `AS` | ASID size |
+| `[37]` | `TBI0` | Ignore top byte for `TTBR0` addresses |
+| `[38]` | `TBI1` | Ignore top byte for `TTBR1` addresses |
+| `[39]` | `HA` | Hardware access-flag updates |
+| `[40]` | `HD` | Hardware dirty-state management |
+| `[41]` onward | Optional controls | Extensions such as `HPD`, `HWU`, `TBID`, `NFD`, `E0PD`, and `TCMA`, depending on architecture version |
+Note: This summarizes common fields; optional fields and exact definitions depend on the ARM architecture revision and implemented extensions.
+
+
+
+If you write `0x34B5203520` to `TCR_EL1`, the CPU interprets it as a 
+64-bit register value whose individual bits configure the MMU. It 
+does not interpret it as a single mode or command.
+
+## Decode the value
+The value is `0x00000034B5203520` when zero-extended to 64 bits.
+
+| Field | Bits | Value | Meaning |
+| --- | --- | --- | --- |
+| `T0SZ` | `[5:0]` | `0x20` = 32 | 32-bit `TTBR0` virtual address region |
+| `EPD0` | `[7]` | 0 | `TTBR0` walks enabled |
+| `IRGN0` | `[9:8]` | 2 | Reserved encoding |
+| `ORGN0` | `[11:10]` | 0 | Normal non-cacheable walk attribute |
+| `SH0` | `[13:12]` | 2 | Outer-shareable |
+| `TG0` | `[15:14]` | 0 | 4 KB granule |
+| `T1SZ` | `[21:16]` | `0x20` = 32 | 32-bit `TTBR1` virtual address region |
+| `TG1` | `[31:30]` | 0 | Reserved encoding |
+| `IPS` | `[34:32]` | 5 | 48-bit physical address size |
+| Other fields | Various | — | Must be decoded against the target CPU's architecture revision |
+
+Important: This value contains reserved encodings in fields such as `IRGN0` and 
+`TG1`. Do not write it into `TCR_EL1` on a real system without verifying the 
+architecture-specific encodings and supported features. Reserved values can 
+cause unpredictable behavior or prevent correct MMU operation.
+
+
+
+			XXX: Its for EL0 and EL1 memory the important result is that both
+			TTBR0_EL1 and TTBR1_EL1 are configured for 32-bit virtual-address regions
+			with 4 KB granules. Assuming the CPU supports the selected features and
+			the rest of the MMU configuration is valid, each region uses 3 page-table
+			levels: L1 → L2 → L3 
+
+			XXX: VA -> PA
+			For the above configuration va -> pa will look like this:-
+			EL0 VA = 0x12345678
+Split it according to the table above:
+Component       VA bits      Value
+L1 index        [31:30]      0x0
+L2 index        [29:21]      0x091
+L3 index        [20:12]      0x145
+Page offset     [11:0]       0x678
+
+The hardware performs the following conceptual steps:
+	Read TTBR0_EL1 to obtain the L1 table base.
+	Read L1 entry 0x0. If it points to an L2 table, follow that address.
+	Read L2 entry 0x091. If it points to an L3 table, follow that address.
+	Read L3 entry 0x145 to obtain the physical page base and check permissions.
+	Add the page offset 0x678 to that physical page base.
+
+*/
     // set translation control register
     _puts("Setting Translation Control Register (TCR_EL1)\n");
     val64 = (uint64)0x34B5203520;
     asm("MSR TCR_EL1, %[v]": :[v]"r" (val64):);
     asm("ISB": : :);
 
+		/* XXX: Kernel page table */
     // set translation table base register 1 (kernel)
     _puts("Setting Translation Table Base Register 1 (TTBR1_EL1)\n");
     val64 = (uint64)kernel_pgtbl;
     asm("MSR TTBR1_EL1, %[v]": :[v]"r" (val64):);
 
+		/* XXX: User page table */
     // set translation table base register 0 (user)
     _puts("Setting Translation Table Base Register 0 (TTBR0_EL1)\n");
     val64 = (uint64)user_pgtbl;
     asm("MSR TTBR0_EL1, %[v]": :[v]"r" (val64):);
     asm("ISB":::);
 
+		/* XXX: SCTLR_EL1 msb = SCTLR_EL1.M
+						SCTLR_EL1.M = 0 — MMU disabled
+						SCTLR_EL1.M = 1 — MMU enabled
+
+						Before setting SCTLR_EL1.M, you must ensure that: TCR_EL1 is
+						configured correctly.  TTBR0_EL1 and TTBR1_EL1 point to valid
+						translation tables.  The page-table descriptors and memory
+						attributes are valid.  The instructions and data accessed
+						immediately after enabling translation remain accessible under the
+						new address mapping.
+		*/
     // set system control register
     _puts("Setting System Control Register (SCTLR_EL1)\n");
     asm("MRS %[r], SCTLR_EL1":[r]"=r" (val32): :); //0x0000000000c50838
